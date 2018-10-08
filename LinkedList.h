@@ -53,7 +53,44 @@ class LinkedList {
                 bool operator!=(const iterator &i) const { return (pointer != i.pointer); }
 
                 friend class LinkedList;
-                //friend class const_iterator;
+                friend class const_iterator;
+        };
+
+        class const_iterator {
+            private: Node* pointer;
+
+            public:
+                const_iterator(Node* l) { pointer = l; }
+                const_iterator() { pointer = &sentinel; }
+                const_iterator(const const_iterator &i) { pointer = i.pointer; }
+                bool operator==(const const_iterator &i) const { return (pointer == i.pointer); }
+                bool operator!=(const const_iterator &i) const { return (pointer != i.pointer); }
+                const_iterator& operator=(const const_iterator &i) {
+                    pointer = i.pointer;
+                    return *this;
+                }
+                
+                const_iterator& operator++() {
+                    pointer = pointer->next;
+                    return *this;
+                } 
+
+                const_iterator& operator++(int) {
+                    pointer = pointer->next;
+                    return *this;
+                }  
+
+                const_iterator& operator--(int) {
+                    pointer = pointer->prev;
+                    return *this;
+                } 
+
+                const_iterator& operator--() {
+                    pointer = pointer->prev;
+                    return *this;
+                }
+            
+                const T& operator*() { return pointer->element; }
         };
 
         LinkedList() {
@@ -62,7 +99,18 @@ class LinkedList {
             sentinel->prev = sentinel;
             sz = 0;
         }
+
+        LinkedList &operator=(const LinkedList &lh) {
+            clear();
+            for (auto x : lh) push_back(x);
+            sz = lh.sz;
+            return *this; 
+        }
         
+        LinkedList(const LinkedList &al) : LinkedList() {
+            for (auto x : al) push_back(x);
+            sz = al.sz;
+        }
         
 /*
         void push_back(const T &t) {
@@ -87,10 +135,19 @@ class LinkedList {
             sz++;
         }
         
+
         iterator erase(iterator position) {
             position.pointer->prev->next = position.pointer->next;            
             position.pointer->next->prev = position.pointer->prev;            
             sz--;
+            auto temp = position.pointer->next;
+            delete position.pointer;
+            return temp;
+        }
+
+        void clear() {
+            int n = size();
+            for (int i=0; i<n; i++) pop_back();
         }
 
         void push_back(const T &t) {
@@ -124,8 +181,13 @@ class LinkedList {
 
 
         iterator begin() { return iterator(sentinel->next); }
-
         iterator end() { return iterator(sentinel); }        
+
+        const_iterator begin() const { return const_iterator(sentinel->next); }
+        const_iterator end() const { return const_iterator(sentinel); }
+
+        const_iterator cbegin() const { return const_iterator(sentinel->next); }
+        const_iterator cend() const { return const_iterator(sentinel); } 
 
         ~LinkedList() { while (sz > 0) pop_back(); }
 };
