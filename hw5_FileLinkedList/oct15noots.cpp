@@ -78,3 +78,11 @@ int main() {
     int sz = 0;
     fwrite(&sz, sizeof(int), 1, f);
 }
+
+/*
+Look at example code online
+freeList is only created when erase is called for the first time
+Freelist is its own linked list deal
+stuff points to addresses
+guuuuhhh fuck this dude
+*/
