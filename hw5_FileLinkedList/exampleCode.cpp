@@ -117,5 +117,10 @@ int main(){
   cout<< ReadData(address,f) <<endl;
 
   fclose(f);
-
 }
+/*Set notes
+ * one passes an iterator, just use the index there
+ * the other one does an index, use the [] here kind of;
+ *      iterator through the collection
+
+

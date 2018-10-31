@@ -1,4 +1,6 @@
-
+#include <cstdio>
+#include <iostream>
+using namespace std;
 template <typename T>
 class FileLinkedList {
 
@@ -36,8 +38,8 @@ class FileLinkedList {
                 fwrite(&sz, sizeof(int), 1, f);
             } else {
                 //read in the size
-                fseek(f, sizeof(Node)+sizeof(int), SEEK_SET);
-                fread(&sz, sizeof(int), 1, f);
+                fseek(f, sizeof(Node)+sizeof(int), SEEK_SET); //skip over sentinel and freelist
+                fread(&sz, sizeof(int), 1, f); 
             }
         }
 
@@ -52,9 +54,9 @@ class FileLinkedList {
             return temp;
         }
 
-         static int WritePrev(int node, int value, FILE* file) {
-            //essentially do the same thing as in ReadPrev,
-            //but use fwrite
+         static void WritePrev(int node, int value, FILE* file) {
+                fseek(file, node+sizeof(T), SEEK_SET);
+                fwrite(&value, sizeof(int), 1, file );
         }
 
          static int ReadNext(int node, FILE* file) {
@@ -96,10 +98,13 @@ class FileLinkedList {
                 temp = freeList; 
                 freeList = ReadNext(freeList, file);
                 fseek(file, sizeof(Node), SEEK_SET); //skips over the Sentinel
-                fread(&freeList, sizeof(int), 1, file); //reads in the new freelist
+                fwrite(&freeList, sizeof(int), 1, file); //reads in the new freelist
+               // int newFree = ReadNext(freeList, file);
+               // fseek(file, sizeof(Node), SEEK_SET);
+               // fwrite(&newFree, sizeof(int), 1, file);
             } else { //if free list is empty
                 temp = sizeof(Node) + 2*sizeof(int) + sz*sizeof(Node); 
-           }
+            }
 
             return temp;
         }
@@ -114,11 +119,9 @@ class FileLinkedList {
             fseek(file, sizeof(Node), SEEK_SET); //skip over the sentinel
             int freelist;
             fread(&freelist, sizeof(int), 1, file); //read the address freelist gives
-                //std::cout << "Freelist: " << freelist << endl;
 
             WriteNext(node, freelist, file); //node.next = freelist
             freelist=node; //free list is now the node that just got deleted
-                //std::cout << "Freelist: " << freelist << endl;
             fseek(file, sizeof(Node), SEEK_SET);
             fwrite(&freelist, sizeof(int), 1, file); //update the freelist
         }        
@@ -145,7 +148,7 @@ class FileLinkedList {
                 const_iterator &operator=(const const_iterator &i) {
                     f = i.f;
                     address = i.address;
-                    return this;
+                    return *this;
                 }
                 bool operator==(const const_iterator &i) { return address == i.address; }
                 bool operator!=(const const_iterator &i) { return address != i.address; }
@@ -177,40 +180,94 @@ class FileLinkedList {
         };
 
         //General Methods
+
+        template<typename I> 
+        FileLinkedList(I begin, I end, const std::string &fname) {
+            f = fopen(fname.c_str(), "w+");
+            sz = 0;         
+            fseek(f, sizeof(Node)+sizeof(int), SEEK_SET);
+            fwrite(&sz, sizeof(int), 1, f);
+            fseek(f, sizeof(T), SEEK_SET);  
+                int prev=0;
+                fwrite(&prev, sizeof(int), 1, f);
+                int next=0;
+                fwrite(&next, sizeof(int), 1, f);
+                //freelist
+                int freelist=-1; 
+                fwrite(&freelist, sizeof(int), 1, f);
+                //sz
+                sz = 0;
+                fwrite(&sz, sizeof(int), 1, f);
+
+            for (auto iter=begin; iter!=end; iter++) push_back(*iter);
+        }
+
         int size() const { return sz; }
+
         void insert(const_iterator position, const T &t) {
             int newAddress = AllocateNode(f, sz);
             //link new node
             WriteData(newAddress, t, f);
             WriteNext(newAddress, position.address, f);
-            WritePrev(newAddress, (position--).address, f);
+            WritePrev(newAddress, ReadPrev(position.address, f), f);
             //relink preexisting nodes
-            WriteNext((position--).address, newAddress, f);
+            WriteNext(ReadPrev(position.address, f), newAddress, f);
             WritePrev(position.address, newAddress, f);
             sz++;
             WriteSz();
         }
+
+        const_iterator erase(const_iterator position) {
+                int prevNodeAddy = ReadPrev(position.address,f);
+                int nextNodeAddy = ReadNext(position.address,f);
+                WriteNext(prevNodeAddy, nextNodeAddy, f);
+                WritePrev(nextNodeAddy, prevNodeAddy, f);
+                DeallocateNode(position.address, f);
+                sz--;
+                WriteSz();
+                return const_iterator(nextNodeAddy, f);
+        }
+
         void push_back(const T &t) { insert(end(),t); }
+        void pop_back() { erase(--end()); }
+        void clear() { while (size()>0) pop_back(); }
+
+        void set(const T & value, int index) {
+            auto iter = begin();
+            for (int i=0; i!=index; i++) iter++;
+            //fseek(f,(sizeof(Node))+(sizeof(int)*2)+(sizeof(Node)*index), SEEK_SET);
+            WriteData(iter.address, value, f);
+            //fwrite(&value, sizeof(T), 1, f);
+        }
+
+        void set(const T & value, const_iterator iter) {
+            fseek(f, iter.address, SEEK_SET);
+            fwrite(&value, sizeof(T), 1, f);
+        }
+
         T operator[](int index) const {
             auto itr=begin();
             for (int i=0; i<index; ++i) ++itr;
             return *itr;
         }
-        
-        void printIter() {
-            std::cout<< "begin -- : " << begin()--.address << '\n';
-            std::cout << "end: " << end().address << '\n';
-            std::cout << "end --: " << end()--.address << '\n';
-            //std::cout << "Difend --: " << difEnd()--.address << '\n';
-            //std::cout << "difend: " << difEnd().address << '\n';
-        } 
 
+        void check_node(const_iterator position) {
+            int nextNodeAddy = ReadNext(position.address,f );
+            int nextPrevNodeAddy = ReadPrev(nextNodeAddy, f);
+            int prevNodeAddy = ReadPrev(position.address,f);
+            int prevNextNodeAddy = ReadNext(prevNodeAddy, f);
+            if (position.address != nextPrevNodeAddy &&
+                prevNextNodeAddy != position.address) std::cout<< "bruh\n";
+        }
+        
+        T readSentinel() { return *--begin(); }
+        
         const_iterator begin() { return const_iterator(ReadNext(0, f), f); }
-        //const_iterator end() { return const_iterator(0, f); }
-        const_iterator end() { return begin()--; }
         const_iterator begin() const { return const_iterator(ReadNext(0, f), f); }
-        const_iterator end()const { return begin()--; }
-        //const_iterator end() const { return const_iterator(0, f); }
+        const_iterator end() const { return --begin(); }
+        const_iterator end() { return --begin(); }
+        const_iterator cend() const { return --begin(); }
+        const_iterator cbegin() const { return const_iterator(ReadNext(0, f), f); }
 
         ~FileLinkedList() { fclose(f); }
 };

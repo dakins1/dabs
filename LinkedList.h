@@ -118,7 +118,21 @@ class LinkedList {
             newNode->element = t;
             newNode->next = sentinel;
             newNode->prev = sentinel->prev;
-            sentinel->prev->next = newNode;
+            se://www.youtube.com/watch?v=WOdXFD5coqo:w
+
+void DeallocateNode(int node, FILE* file){
+    //read freelist
+    fseek(file, sizeof(Node), SEEK_SET);
+    int freelist;
+    fread(&freelist, sizeof(int), 1, file);
+        std::cout << "Freelist: " << freelist << endl;
+
+    WriteNext (node, freelist, file);
+    freelist=node;
+        std::cout << "Freelist: " << freelist << endl;
+    fseek(file, sizeof(Node), SEEK_SET);
+    fwrite(&freelist, sizeof(int), 1, file);
+}tinel->prev->next = newNode;
             sentinel->prev = newNode;
             sz++;
             if (sz == 1) sentinel->next = newNode;
